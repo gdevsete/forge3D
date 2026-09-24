@@ -1,0 +1,5 @@
+[functions.streetpay-webhook]
+verify_jwt = false
+
+[functions.streetpay-create-payment]
+verify_jwt = false

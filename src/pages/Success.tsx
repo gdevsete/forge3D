@@ -1,0 +1,3 @@
+import { Link } from 'react-router-dom';
+import { CheckCircle2, Download, ArrowRight } from 'lucide-react';
+export function Success() { return <div className="success-page"><div className="success-card"><CheckCircle2 size={54}/><span className="eyebrow">PEDIDO RECEBIDO</span><h1>Quase lá.</h1><p>O pagamento será confirmado pela gateway. Quando estiver aprovado, seu pedido será atualizado e, para produtos digitais, o download ficará disponível.</p><div className="success-actions"><Link to="/stl" className="btn btn-dark">CONTINUAR COMPRANDO <ArrowRight size={17}/></Link><Link to="/" className="text-link"><Download size={16}/> IR PARA MINHA CONTA</Link></div></div></div> }
