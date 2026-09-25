@@ -1,4 +1,3 @@
-
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -466,10 +465,16 @@ function SalesObjectionCarousel() {
       const child = carousel.children.item(nextIndex) as HTMLElement | null;
 
       if (child) {
-        child.scrollIntoView({
+        const targetLeft =
+          child.offsetLeft -
+          Math.max(
+            (carousel.clientWidth - child.offsetWidth) / 2,
+            0,
+          );
+
+        carousel.scrollTo({
+          left: Math.max(targetLeft, 0),
           behavior: 'smooth',
-          block: 'nearest',
-          inline: 'center',
         });
       }
 
@@ -495,10 +500,16 @@ function SalesObjectionCarousel() {
       return;
     }
 
-    child.scrollIntoView({
+    const targetLeft =
+      child.offsetLeft -
+      Math.max(
+        (carousel.clientWidth - child.offsetWidth) / 2,
+        0,
+      );
+
+    carousel.scrollTo({
+      left: Math.max(targetLeft, 0),
       behavior: 'smooth',
-      block: 'nearest',
-      inline: 'center',
     });
 
     setActiveIndex(safeIndex);
