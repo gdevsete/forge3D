@@ -18,6 +18,7 @@ import { Checkout } from './pages/Checkout';
 import { About } from './pages/About';
 import { Success } from './pages/Success';
 import { AdminGate } from './pages/Admin';
+import { LandingPage } from './pages/LandingPage';
 
 import {
   initMetaPixel,
@@ -211,6 +212,15 @@ function App() {
         <Route
           path="/admin"
           element={<AdminGate />}
+        />
+
+        <Route
+          path="/oferta/:slug"
+          element={
+            <LandingPage
+              onAdd={add}
+            />
+          }
         />
 
         <Route

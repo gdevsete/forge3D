@@ -714,9 +714,7 @@ create index if not exists cart_items_product_id_idx
   on public.cart_items(product_id);
 
 
--- ============================================================
--- ROW LEVEL SECURITY
--- ============================================================
+
 
 alter table public.leads enable row level security;
 alter table public.profiles enable row level security;
