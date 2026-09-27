@@ -6,6 +6,18 @@ export type ProductType = 'stl' | 'physical';
 
 export type ProductMediaType = 'image' | 'video';
 
+export type LandingTemplate = 'product' | 'turbo';
+
+export interface LandingFaq {
+  question: string;
+  answer: string;
+}
+
+export interface LandingBenefit {
+  title: string;
+  text: string;
+}
+
 export interface ProductMedia {
   id: string;
   productId: string;
@@ -29,6 +41,25 @@ export interface Product {
   compareStlPrice: number | null;
   printedPrice: number;
   comparePrintedPrice: number | null;
+
+  stlEnabled: boolean;
+  printedEnabled: boolean;
+
+  landingTemplate: LandingTemplate;
+  landingBadge: string | null;
+  landingTitle: string | null;
+  landingSubtitle: string | null;
+  landingDescription: string | null;
+  landingWhyTitle: string | null;
+  landingWhyDescription: string | null;
+  landingBenefits: LandingBenefit[];
+  landingStlPoints: string[];
+  landingPrintedPoints: string[];
+  landingDetailTitle: string | null;
+  landingDetailDescription: string | null;
+  landingFaq: LandingFaq[];
+  landingFinalTitle: string | null;
+  landingFinalDescription: string | null;
 
   // Campos legados mantidos para compatibilidade.
   price: number;
@@ -71,6 +102,26 @@ interface SupabaseProduct {
   printed_price: number | string;
   compare_stl_price: number | string | null;
   compare_printed_price: number | string | null;
+
+  stl_enabled: boolean | null;
+  printed_enabled: boolean | null;
+
+  landing_template: LandingTemplate | null;
+  landing_badge: string | null;
+  landing_title: string | null;
+  landing_subtitle: string | null;
+  landing_description: string | null;
+  landing_why_title: string | null;
+  landing_why_description: string | null;
+  landing_benefits: unknown;
+  landing_stl_points: unknown;
+  landing_printed_points: unknown;
+  landing_detail_title: string | null;
+  landing_detail_description: string | null;
+  landing_faq: unknown;
+  landing_final_title: string | null;
+  landing_final_description: string | null;
+
   thumbnail_url: string | null;
   active: boolean;
   featured: boolean;
@@ -132,6 +183,84 @@ function normalizeProductMedia(
     }));
 }
 
+function normalizeLandingBenefits(
+  value: unknown,
+): LandingBenefit[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((item) => {
+      if (
+        typeof item === 'object' &&
+        item !== null
+      ) {
+        const candidate =
+          item as Record<string, unknown>;
+
+        return {
+          title:
+            typeof candidate.title === 'string'
+              ? candidate.title.trim()
+              : '',
+          text:
+            typeof candidate.text === 'string'
+              ? candidate.text.trim()
+              : '',
+        };
+      }
+
+      if (typeof item === 'string') {
+        return {
+          title: item.trim(),
+          text: '',
+        };
+      }
+
+      return {
+        title: '',
+        text: '',
+      };
+    })
+    .filter((item) => item.title);
+}
+
+function normalizeStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((item): item is string => typeof item === 'string')
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function normalizeLandingFaq(value: unknown): LandingFaq[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter(
+      (item): item is Record<string, unknown> =>
+        typeof item === 'object' &&
+        item !== null,
+    )
+    .map((item) => ({
+      question:
+        typeof item.question === 'string'
+          ? item.question.trim()
+          : '',
+      answer:
+        typeof item.answer === 'string'
+          ? item.answer.trim()
+          : '',
+    }))
+    .filter((item) => item.question && item.answer);
+}
+
 function normalizeProduct(
   product: SupabaseProduct,
   media: SupabaseProductMedia[],
@@ -183,6 +312,43 @@ function normalizeProduct(
     compareStlPrice,
     printedPrice,
     comparePrintedPrice,
+
+    stlEnabled:
+      product.stl_enabled ?? stlPrice > 0,
+    printedEnabled:
+      product.printed_enabled ?? printedPrice > 0,
+
+    landingTemplate:
+      product.landing_template === 'turbo'
+        ? 'turbo'
+        : 'product',
+    landingBadge: product.landing_badge,
+    landingTitle: product.landing_title,
+    landingSubtitle: product.landing_subtitle,
+    landingDescription: product.landing_description,
+    landingWhyTitle:
+      product.landing_why_title,
+    landingWhyDescription:
+      product.landing_why_description,
+    landingBenefits:
+      normalizeLandingBenefits(
+        product.landing_benefits,
+      ),
+    landingStlPoints: normalizeStringArray(
+      product.landing_stl_points,
+    ),
+    landingPrintedPoints: normalizeStringArray(
+      product.landing_printed_points,
+    ),
+    landingDetailTitle: product.landing_detail_title,
+    landingDetailDescription:
+      product.landing_detail_description,
+    landingFaq: normalizeLandingFaq(
+      product.landing_faq,
+    ),
+    landingFinalTitle: product.landing_final_title,
+    landingFinalDescription:
+      product.landing_final_description,
 
     // Compatibilidade com componentes que ainda usam o preço legado.
     price: stlPrice,
@@ -244,6 +410,23 @@ export async function getProducts(): Promise<Product[]> {
       printed_price,
       compare_stl_price,
       compare_printed_price,
+      stl_enabled,
+      printed_enabled,
+      landing_template,
+      landing_badge,
+      landing_title,
+      landing_subtitle,
+      landing_description,
+      landing_why_title,
+      landing_why_description,
+      landing_benefits,
+      landing_stl_points,
+      landing_printed_points,
+      landing_detail_title,
+      landing_detail_description,
+      landing_faq,
+      landing_final_title,
+      landing_final_description,
       thumbnail_url,
       active,
       featured,

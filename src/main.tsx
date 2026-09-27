@@ -19,6 +19,7 @@ import { About } from './pages/About';
 import { Success } from './pages/Success';
 import { AdminGate } from './pages/Admin';
 import { LandingPage } from './pages/LandingPage';
+import { LinksPage } from './pages/LinksPage';
 
 import {
   initMetaPixel,
@@ -84,6 +85,37 @@ function App() {
 
   const [cartOpen, setCartOpen] =
     useState(false);
+
+  const location = useLocation();
+
+  useEffect(() => {
+    const path =
+      location.pathname + location.search;
+
+    // Guarda a última landing de oferta visitada para que,
+    // ao voltar do checkout/carrinho, o cliente retorne ao anúncio/oferta.
+    if (location.pathname.startsWith('/oferta/')) {
+      sessionStorage.setItem(
+        'forge3d:offer-return-path',
+        path,
+      );
+      return;
+    }
+
+    // Checkout e carrinho fazem parte do mesmo fluxo da oferta.
+    // Não apagamos a referência nesses dois caminhos.
+    if (
+      location.pathname === '/checkout' ||
+      location.pathname === '/carrinho'
+    ) {
+      return;
+    }
+
+    // Ao entrar em qualquer área normal da loja, começamos um novo fluxo.
+    sessionStorage.removeItem(
+      'forge3d:offer-return-path',
+    );
+  }, [location.pathname, location.search]);
 
   function add(
     product: Product,
@@ -224,6 +256,26 @@ function App() {
         />
 
         <Route
+          path="/links"
+          element={<LinksPage />}
+        />
+
+
+        {/*
+         * O checkout fica fora do Layout público.
+         * Assim ele não herda o header, navegação, catálogo
+         * ou carrinho lateral da loja comum.
+         */}
+        <Route
+          path="/checkout"
+          element={
+            <Checkout
+              items={items}
+            />
+          }
+        />
+
+        <Route
           element={
             <Layout
               cartCount={getCartQuantity(items)}
@@ -288,15 +340,7 @@ function App() {
             }
           />
 
-          <Route
-            path="/checkout"
-            element={
-              <Checkout
-                items={items}
-              />
-            }
-          />
-
+  
           <Route
             path="/sobre"
             element={

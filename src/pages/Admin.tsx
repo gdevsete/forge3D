@@ -1,6 +1,7 @@
 
 import { ProductMediaManager } from '../components/admin/ProductMediaManager';
 import { ProductVariantManager } from '../components/admin/ProductVariantManager';
+import { ProductFileManager } from '../components/admin/ProductFileManager';
 import {
   useCallback,
   useEffect,
@@ -15,6 +16,7 @@ import {
   Download,
   Edit3,
   ExternalLink,
+  Eye,
   FolderPlus,
   LogIn,
   LogOut,
@@ -93,6 +95,18 @@ type Category = {
   updated_at: string;
 };
 
+type ProductLandingTemplate = 'product' | 'turbo';
+
+type LandingBenefit = {
+  title: string;
+  text: string;
+};
+
+type LandingFaq = {
+  question: string;
+  answer: string;
+};
+
 type Product = {
   id: string;
   category_id: string | null;
@@ -101,13 +115,31 @@ type Product = {
   description: string;
   product_type: ProductType;
 
-  // Preços específicos de cada modalidade de compra.
   stl_price: number;
   printed_price: number;
   compare_stl_price: number | null;
   compare_printed_price: number | null;
 
-  // Campos legados mantidos para compatibilidade com partes antigas do sistema.
+  stl_enabled: boolean | null;
+  printed_enabled: boolean | null;
+
+  landing_template: ProductLandingTemplate | null;
+  landing_badge: string | null;
+  landing_title: string | null;
+  landing_subtitle: string | null;
+  landing_description: string | null;
+  landing_why_title: string | null;
+  landing_why_description: string | null;
+  landing_benefits: unknown;
+  landing_stl_points: unknown;
+  landing_printed_points: unknown;
+  landing_detail_title: string | null;
+  landing_detail_description: string | null;
+  landing_faq: unknown;
+  landing_final_title: string | null;
+  landing_final_description: string | null;
+
+  // Campos legados mantidos para compatibilidade.
   price: number;
   compare_price: number | null;
 
@@ -128,12 +160,34 @@ type ProductForm = {
   slug: string;
   description: string;
   product_type: ProductType;
+
+  stl_enabled: boolean;
+  printed_enabled: boolean;
+
   stl_price: string;
   compare_stl_price: string;
   printed_price: string;
   compare_printed_price: string;
+
   thumbnail_url: string;
   category_id: string;
+
+  landing_template: ProductLandingTemplate;
+  landing_badge: string;
+  landing_title: string;
+  landing_subtitle: string;
+  landing_description: string;
+  landing_why_title: string;
+  landing_why_description: string;
+  landing_benefits: LandingBenefit[];
+  landing_stl_points: string[];
+  landing_printed_points: string[];
+  landing_detail_title: string;
+  landing_detail_description: string;
+  landing_faq: LandingFaq[];
+  landing_final_title: string;
+  landing_final_description: string;
+
   active: boolean;
   featured: boolean;
   is_new: boolean;
@@ -162,89 +216,56 @@ const emptyProductForm: ProductForm = {
   slug: '',
   description: '',
   product_type: 'stl',
+
+  stl_enabled: true,
+  printed_enabled: true,
+
   stl_price: '',
   compare_stl_price: '',
   printed_price: '',
   compare_printed_price: '',
+
   thumbnail_url: '',
   category_id: '',
+
+  landing_template: 'product',
+  landing_badge: 'OFERTA ESPECIAL',
+  landing_title: '',
+  landing_subtitle: '',
+  landing_description: '',
+  landing_why_title: '',
+  landing_why_description: '',
+  landing_benefits: [
+    { title: '', text: '' },
+    { title: '', text: '' },
+    { title: '', text: '' },
+    { title: '', text: '' },
+  ],
+  landing_stl_points: [
+    '',
+    '',
+    '',
+  ],
+  landing_printed_points: [
+    '',
+    '',
+    '',
+  ],
+  landing_detail_title: '',
+  landing_detail_description: '',
+  landing_faq: [
+    { question: '', answer: '' },
+    { question: '', answer: '' },
+    { question: '', answer: '' },
+  ],
+  landing_final_title: '',
+  landing_final_description: '',
+
   active: true,
   featured: false,
   is_new: false,
   is_best_seller: false,
 };
-
-const demoLeads: Lead[] = [
-  {
-    id: 'L-001',
-    date: '2026-09-17 01:10',
-    name: 'Cliente Demo',
-    email: 'cliente@example.com',
-    state: 'SP',
-    city: 'São Paulo',
-    source: 'facebook',
-    medium: 'paid_social',
-    campaign: 'forge3d-stl-01',
-    content: 'video-01',
-    referrer: 'https://facebook.com/',
-    landing: '/produto/suporte-modular-celular',
-    event: 'ViewContent',
-  },
-  {
-    id: 'L-002',
-    date: '2026-09-17 00:52',
-    name: 'Cliente Demo',
-    email: 'cliente2@example.com',
-    state: 'MG',
-    city: 'Belo Horizonte',
-    source: 'instagram',
-    medium: 'paid_social',
-    campaign: 'forge3d-stl-01',
-    content: 'reels-02',
-    referrer: 'https://instagram.com/',
-    landing: '/stl',
-    event: 'Lead',
-  },
-  {
-    id: 'L-003',
-    date: '2026-09-16 23:47',
-    name: 'Cliente Demo',
-    email: 'cliente3@example.com',
-    state: 'PR',
-    city: 'Curitiba',
-    source: 'google',
-    medium: 'cpc',
-    campaign: 'stl-mecanicas',
-    content: 'search-01',
-    referrer: 'https://google.com/',
-    landing: '/produto/kit-engrenagens-mecanicas',
-    event: 'AddToCart',
-  },
-];
-
-function readLeads(): Lead[] {
-  if (typeof window === 'undefined') {
-    return demoLeads;
-  }
-
-  try {
-    const raw = localStorage.getItem('forge3d_leads');
-
-    if (!raw) {
-      return demoLeads;
-    }
-
-    const parsed = JSON.parse(raw);
-
-    if (!Array.isArray(parsed)) {
-      return demoLeads;
-    }
-
-    return [...demoLeads, ...parsed];
-  } catch {
-    return demoLeads;
-  }
-}
 
 function slugify(value: string): string {
   return value
@@ -269,8 +290,134 @@ function formatCurrency(value: number | null): string {
 }
 
 function parsePrice(value: string): number {
-  const normalized = value.replace(',', '.').trim();
-  return Number(normalized);
+  const cleaned = value
+    .replace(/R\$\s*/gi, '')
+    .replace(/\s/g, '')
+    .trim();
+
+  if (!cleaned) {
+    return 0;
+  }
+
+  if (cleaned.includes(',')) {
+    return Number(
+      cleaned
+        .replace(/\./g, '')
+        .replace(',', '.'),
+    );
+  }
+
+  // Sem vírgula, preserva 19.90 como decimal,
+  // mas entende 1.099 como mil e noventa e nove.
+  if (
+    /^\d+(?:\.\d{3})+$/.test(
+      cleaned,
+    )
+  ) {
+    return Number(
+      cleaned.replace(/\./g, ''),
+    );
+  }
+
+  return Number(cleaned);
+}
+
+function toStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((item): item is string => typeof item === 'string')
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function toLandingBenefits(value: unknown): LandingBenefit[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((item) => {
+      if (
+        typeof item === 'object' &&
+        item !== null
+      ) {
+        const candidate =
+          item as Record<string, unknown>;
+
+        return {
+          title:
+            typeof candidate.title === 'string'
+              ? candidate.title.trim()
+              : '',
+          text:
+            typeof candidate.text === 'string'
+              ? candidate.text.trim()
+              : '',
+        };
+      }
+
+      if (typeof item === 'string') {
+        return {
+          title: item.trim(),
+          text: '',
+        };
+      }
+
+      return {
+        title: '',
+        text: '',
+      };
+    })
+    .filter((item) => item.title || item.text);
+}
+
+function toLandingFaq(value: unknown): LandingFaq[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((item) => {
+      if (
+        typeof item !== 'object' ||
+        item === null
+      ) {
+        return {
+          question: '',
+          answer: '',
+        };
+      }
+
+      const candidate =
+        item as Record<string, unknown>;
+
+      return {
+        question:
+          typeof candidate.question === 'string'
+            ? candidate.question.trim()
+            : '',
+        answer:
+          typeof candidate.answer === 'string'
+            ? candidate.answer.trim()
+            : '',
+      };
+    })
+    .filter((item) => item.question && item.answer);
+}
+
+function cleanAdminText(value: string): string {
+  return value
+    .replace(/#{1,6}\s*/g, '')
+    .replace(/[*_`~]/g, '')
+    .replace(
+      /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu,
+      '',
+    )
+    .replace(/\s{2,}/g, ' ')
+    .trim();
 }
 
 export function AdminGate() {
@@ -1431,7 +1578,7 @@ function ProductManager({
         .join(' ')
         .toLowerCase();
 
-      return (
+  return (
         matchesType &&
         searchableText.includes(normalizedSearch)
       );
@@ -1457,6 +1604,12 @@ function ProductManager({
   }
 
   function openEditForm(product: Product) {
+    const benefits = toLandingBenefits(
+      product.landing_benefits,
+    );
+
+    const faqs = toLandingFaq(product.landing_faq);
+
     setEditingProductId(product.id);
 
     setForm({
@@ -1464,7 +1617,19 @@ function ProductManager({
       slug: product.slug,
       description: product.description,
       product_type: product.product_type,
-      stl_price: String(product.stl_price ?? product.price),
+
+      stl_enabled:
+        product.stl_enabled ??
+        (Number(product.stl_price ?? product.price) > 0),
+
+      printed_enabled:
+        product.printed_enabled ??
+        (Number(product.printed_price ?? 0) > 0),
+
+      stl_price: String(
+        product.stl_price ?? product.price,
+      ),
+
       compare_stl_price:
         product.compare_stl_price !== null &&
         product.compare_stl_price !== undefined
@@ -1472,14 +1637,123 @@ function ProductManager({
           : product.compare_price !== null
             ? String(product.compare_price)
             : '',
-      printed_price: String(product.printed_price ?? product.price),
+
+      printed_price: String(
+        product.printed_price ?? 0,
+      ),
+
       compare_printed_price:
         product.compare_printed_price !== null &&
         product.compare_printed_price !== undefined
           ? String(product.compare_printed_price)
           : '',
-      thumbnail_url: product.thumbnail_url ?? '',
-      category_id: product.category_id ?? '',
+
+      thumbnail_url:
+        product.thumbnail_url ?? '',
+      category_id:
+        product.category_id ?? '',
+
+      landing_template:
+        product.landing_template === 'turbo'
+          ? 'turbo'
+          : 'product',
+
+      landing_badge:
+        product.landing_badge ?? '',
+
+      landing_title:
+        product.landing_title ?? product.name,
+
+      landing_subtitle:
+        product.landing_subtitle ?? '',
+
+      landing_description:
+        product.landing_description ??
+        '',
+
+      landing_why_title:
+        product.landing_why_title ?? '',
+
+      landing_why_description:
+        product.landing_why_description ??
+        '',
+
+      landing_benefits:
+        benefits.length > 0
+          ? [
+              ...benefits,
+              ...Array.from(
+                {
+                  length: Math.max(
+                    0,
+                    4 - benefits.length,
+                  ),
+                },
+                () => ({
+                  title: '',
+                  text: '',
+                }),
+              ),
+            ].slice(0, 4)
+          : emptyProductForm.landing_benefits.map(
+              (item) => ({ ...item }),
+            ),
+
+      landing_stl_points:
+        [
+          ...toStringArray(
+            product.landing_stl_points,
+          ),
+          '',
+          '',
+          '',
+        ].slice(0, 4),
+
+      landing_printed_points:
+        [
+          ...toStringArray(
+            product.landing_printed_points,
+          ),
+          '',
+          '',
+          '',
+        ].slice(0, 4),
+
+      landing_detail_title:
+        product.landing_detail_title ?? '',
+
+      landing_detail_description:
+        product.landing_detail_description ??
+        '',
+
+      landing_faq:
+        faqs.length > 0
+          ? [
+              ...faqs,
+              ...Array.from(
+                {
+                  length: Math.max(
+                    0,
+                    4 - faqs.length,
+                  ),
+                },
+                () => ({
+                  question: '',
+                  answer: '',
+                }),
+              ),
+            ].slice(0, 4)
+          : emptyProductForm.landing_faq.map(
+              (item) => ({ ...item }),
+            ),
+
+      landing_final_title:
+        product.landing_final_title ?? '',
+
+      landing_final_description:
+        product.landing_final_description ??
+        '',
+
       active: product.active,
       featured: product.featured,
       is_new: product.is_new,
@@ -1501,25 +1775,81 @@ function ProductManager({
     setForm(emptyProductForm);
   }
 
-  async function saveProduct(event: FormEvent<HTMLFormElement>) {
+  async function saveProduct(
+    event: FormEvent<HTMLFormElement>,
+  ) {
     event.preventDefault();
 
     setError('');
     setSuccess('');
 
-    const name = form.name.trim();
-    const slug = slugify(form.slug || form.name);
+    const name = cleanAdminText(form.name);
+    const slug = slugify(form.slug || name);
 
     const stlPrice = parsePrice(form.stl_price);
-    const printedPrice = parsePrice(form.printed_price);
+    const printedPrice = parsePrice(
+      form.printed_price,
+    );
 
-    const compareStlPrice = form.compare_stl_price.trim()
-      ? parsePrice(form.compare_stl_price)
-      : null;
+    const compareStlPrice =
+      form.compare_stl_price.trim()
+        ? parsePrice(
+            form.compare_stl_price,
+          )
+        : null;
 
-    const comparePrintedPrice = form.compare_printed_price.trim()
-      ? parsePrice(form.compare_printed_price)
-      : null;
+    const comparePrintedPrice =
+      form.compare_printed_price.trim()
+        ? parsePrice(
+            form.compare_printed_price,
+          )
+        : null;
+
+    const landingBenefits =
+      form.landing_benefits
+        .map((item) => ({
+          title: cleanAdminText(
+            item.title,
+          ),
+          text: cleanAdminText(
+            item.text,
+          ),
+        }))
+        .filter(
+          (item) =>
+            item.title ||
+            item.text,
+        );
+
+    const landingStlPoints =
+      form.landing_stl_points
+        .map((item) =>
+          cleanAdminText(item),
+        )
+        .filter(Boolean);
+
+    const landingPrintedPoints =
+      form.landing_printed_points
+        .map((item) =>
+          cleanAdminText(item),
+        )
+        .filter(Boolean);
+
+    const landingFaq =
+      form.landing_faq
+        .map((item) => ({
+          question: cleanAdminText(
+            item.question,
+          ),
+          answer: cleanAdminText(
+            item.answer,
+          ),
+        }))
+        .filter(
+          (item) =>
+            item.question &&
+            item.answer,
+        );
 
     if (!name) {
       setError('Informe o nome do produto.');
@@ -1531,78 +1861,300 @@ function ProductManager({
       return;
     }
 
-    if (!form.description.trim()) {
-      setError('Informe a descrição do produto.');
+    if (
+      !form.stl_enabled &&
+      !form.printed_enabled
+    ) {
+      setError(
+        'Ative pelo menos uma modalidade de venda.',
+      );
       return;
     }
 
-    if (!Number.isFinite(stlPrice) || stlPrice < 0) {
-      setError('Informe um preço válido para o STL.');
+    if (
+      form.stl_enabled &&
+      (!Number.isFinite(stlPrice) ||
+        stlPrice <= 0)
+    ) {
+      setError(
+        'Informe um preço válido para o STL ou desative a modalidade STL.',
+      );
       return;
     }
 
-    if (!Number.isFinite(printedPrice) || printedPrice < 0) {
-      setError('Informe um preço válido para o modelo impresso.');
+    if (
+      form.printed_enabled &&
+      (!Number.isFinite(
+        printedPrice,
+      ) ||
+        printedPrice <= 0)
+    ) {
+      setError(
+        'Informe um preço válido para o modelo impresso ou desative essa modalidade.',
+      );
       return;
     }
 
     if (
       compareStlPrice !== null &&
-      (!Number.isFinite(compareStlPrice) || compareStlPrice < 0)
+      (!Number.isFinite(
+        compareStlPrice,
+      ) ||
+        compareStlPrice <= stlPrice)
     ) {
-      setError('Informe um preço anterior válido para o STL.');
+      setError(
+        'O preço anterior do STL deve ser maior que o preço atual.',
+      );
       return;
     }
 
     if (
-      comparePrintedPrice !== null &&
-      (!Number.isFinite(comparePrintedPrice) || comparePrintedPrice < 0)
+      comparePrintedPrice !==
+        null &&
+      (!Number.isFinite(
+        comparePrintedPrice,
+      ) ||
+        comparePrintedPrice <=
+          printedPrice)
     ) {
-      setError('Informe um preço anterior válido para o modelo impresso.');
+      setError(
+        'O preço anterior do modelo impresso deve ser maior que o preço atual.',
+      );
       return;
     }
 
     setSaving(true);
 
-    const payload = {
-      category_id: form.category_id || null,
-      name,
-      slug,
-      description: form.description.trim(),
-      product_type: form.product_type,
-
-      // Campos atuais: um preço para cada modalidade.
-      stl_price: stlPrice,
-      compare_stl_price: compareStlPrice,
-      printed_price: printedPrice,
-      compare_printed_price: comparePrintedPrice,
-
-      // Compatibilidade: price/compare_price passam a representar o STL.
-      price: stlPrice,
-      compare_price: compareStlPrice,
-
-      thumbnail_url: form.thumbnail_url.trim() || null,
-      active: form.active,
-      featured: form.featured,
-      is_new: form.is_new,
-      is_best_seller: form.is_best_seller,
-      updated_at: new Date().toISOString(),
-    };
-
     try {
+      if (
+        editingProductId &&
+        form.active &&
+        form.stl_enabled
+      ) {
+        const {
+          count: stlFileCount,
+          error: stlFileCountError,
+        } = await supabase
+          .from('product_files')
+          .select('id', {
+            count: 'exact',
+            head: true,
+          })
+          .eq(
+            'product_id',
+            editingProductId,
+          );
+
+        if (stlFileCountError) {
+          throw stlFileCountError;
+        }
+
+        if (!stlFileCount) {
+          setError(
+            'O STL está habilitado, mas não existe arquivo STL cadastrado. Envie o arquivo antes de publicar o produto.',
+          );
+          return;
+        }
+      }
+
+      if (!editingProductId) {
+        const { data: slugExists, error: slugError } =
+          await supabase
+            .from('products')
+            .select('id')
+            .eq('slug', slug)
+            .limit(1)
+            .maybeSingle();
+
+        if (slugError) {
+          throw slugError;
+        }
+
+        if (slugExists) {
+          setError(
+            'Este slug já está sendo usado por outro produto.',
+          );
+          return;
+        }
+      } else {
+        const { data: slugExists, error: slugError } =
+          await supabase
+            .from('products')
+            .select('id')
+            .eq('slug', slug)
+            .neq('id', editingProductId)
+            .limit(1)
+            .maybeSingle();
+
+        if (slugError) {
+          throw slugError;
+        }
+
+        if (slugExists) {
+          setError(
+            'Este slug já está sendo usado por outro produto.',
+          );
+          return;
+        }
+      }
+
+      const payload = {
+        category_id:
+          form.category_id || null,
+
+        name,
+        slug,
+        description:
+          form.description.trim(),
+        product_type:
+          form.product_type,
+
+        stl_enabled:
+          form.stl_enabled,
+
+        printed_enabled:
+          form.printed_enabled,
+
+        stl_price:
+          form.stl_enabled
+            ? stlPrice
+            : 0,
+
+        compare_stl_price:
+          form.stl_enabled
+            ? compareStlPrice
+            : null,
+
+        printed_price:
+          form.printed_enabled
+            ? printedPrice
+            : 0,
+
+        compare_printed_price:
+          form.printed_enabled
+            ? comparePrintedPrice
+            : null,
+
+        // Compatibilidade com o código antigo.
+        price:
+          form.stl_enabled
+            ? stlPrice
+            : form.printed_enabled
+              ? printedPrice
+              : 0,
+
+        compare_price:
+          form.stl_enabled
+            ? compareStlPrice
+            : null,
+
+        thumbnail_url:
+          form.thumbnail_url.trim() ||
+          null,
+
+        landing_template:
+          form.landing_template,
+
+        landing_badge:
+          cleanAdminText(
+            form.landing_badge,
+          ) || null,
+
+        landing_title:
+          cleanAdminText(
+            form.landing_title,
+          ) || name,
+
+        landing_subtitle:
+          cleanAdminText(
+            form.landing_subtitle,
+          ) || null,
+
+        landing_description:
+          cleanAdminText(
+            form.landing_description,
+          ) || null,
+
+        landing_why_title:
+          cleanAdminText(
+            form.landing_why_title,
+          ) || null,
+
+        landing_why_description:
+          cleanAdminText(
+            form.landing_why_description,
+          ) || null,
+
+        landing_benefits:
+          landingBenefits,
+
+        landing_stl_points:
+          landingStlPoints,
+
+        landing_printed_points:
+          landingPrintedPoints,
+
+        landing_detail_title:
+          cleanAdminText(
+            form.landing_detail_title,
+          ) || null,
+
+        landing_detail_description:
+          cleanAdminText(
+            form.landing_detail_description,
+          ) || null,
+
+        landing_faq:
+          landingFaq,
+
+        landing_final_title:
+          cleanAdminText(
+            form.landing_final_title,
+          ) || name,
+
+        landing_final_description:
+          cleanAdminText(
+            form.landing_final_description,
+          ) || null,
+
+        active:
+          form.active &&
+          (
+            !form.stl_enabled ||
+            Boolean(editingProductId)
+          ),
+        featured: form.featured,
+        is_new: form.is_new,
+        is_best_seller:
+          form.is_best_seller,
+
+        updated_at:
+          new Date().toISOString(),
+      };
+
       if (editingProductId) {
-        const { error: updateError } = await supabase
+        const {
+          error: updateError,
+        } = await supabase
           .from('products')
           .update(payload)
-          .eq('id', editingProductId);
+          .eq(
+            'id',
+            editingProductId,
+          );
 
         if (updateError) {
           throw updateError;
         }
 
-        setSuccess('Produto atualizado com sucesso.');
+        setSuccess(
+          'Produto e configuração da landing atualizados com sucesso.',
+        );
       } else {
-        const { data: insertedProduct, error: insertError } = await supabase
+        const {
+          data: insertedProduct,
+          error: insertError,
+        } = await supabase
           .from('products')
           .insert(payload)
           .select('id')
@@ -1612,23 +2164,33 @@ function ProductManager({
           throw insertError;
         }
 
-        setEditingProductId(insertedProduct.id);
+        setEditingProductId(
+          insertedProduct.id,
+        );
+
         setSuccess(
-          'Produto cadastrado. Agora você pode adicionar imagens e vídeos.',
+          form.stl_enabled
+            ? 'Produto cadastrado como rascunho até o arquivo STL ser enviado. Adicione as mídias, envie o STL e depois ative o produto.'
+            : 'Produto cadastrado. Agora adicione as mídias e confira a landing.',
         );
       }
 
       await loadCatalog();
       onRefresh();
     } catch (saveError) {
-      console.error('[Admin] Erro ao salvar produto:', saveError);
+      console.error(
+        '[Admin] Erro ao salvar produto:',
+        saveError,
+      );
 
       const message =
         saveError instanceof Error
           ? saveError.message
           : 'Erro desconhecido ao salvar produto.';
 
-      setError(`Não foi possível salvar o produto: ${message}`);
+      setError(
+        `Não foi possível salvar o produto: ${message}`,
+      );
     } finally {
       setSaving(false);
     }
@@ -1731,6 +2293,89 @@ function ProductManager({
     }
   }
 
+      function updateLandingBenefit(
+    index: number,
+    field: keyof LandingBenefit,
+    value: string,
+  ) {
+    setForm((current) => {
+      const benefits =
+        current.landing_benefits.map(
+          (item, itemIndex) =>
+            itemIndex === index
+              ? {
+                  ...item,
+                  [field]: value,
+                }
+              : item,
+        );
+
+      return {
+        ...current,
+        landing_benefits:
+          benefits,
+      };
+    });
+  }
+
+  function updateLandingPoint(
+    field:
+      | 'landing_stl_points'
+      | 'landing_printed_points',
+    index: number,
+    value: string,
+  ) {
+    setForm((current) => ({
+      ...current,
+      [field]: current[field].map(
+        (item, itemIndex) =>
+          itemIndex === index
+            ? value
+            : item,
+      ),
+    }));
+  }
+
+  function updateLandingFaq(
+    index: number,
+    field: keyof LandingFaq,
+    value: string,
+  ) {
+    setForm((current) => ({
+      ...current,
+      landing_faq:
+        current.landing_faq.map(
+          (item, itemIndex) =>
+            itemIndex === index
+              ? {
+                  ...item,
+                  [field]: value,
+                }
+              : item,
+        ),
+    }));
+  }
+
+  function openLandingPreview() {
+    const slug = slugify(
+      form.slug || form.name,
+    );
+
+    if (!slug) {
+      setError(
+        'Defina o slug antes de abrir a oferta.',
+      );
+      return;
+    }
+
+    window.open(
+      `/oferta/${slug}`,
+      '_blank',
+      'noopener,noreferrer',
+    );
+  }
+
+
   return (
     <main className="container admin-main">
       <div className="admin-title">
@@ -1793,7 +2438,9 @@ function ProductManager({
           label="ARQUIVOS STL"
           value={String(
             products.filter(
-              (product) => product.product_type === 'stl',
+              (product) =>
+                product.stl_enabled ??
+                product.stl_price > 0,
             ).length,
           )}
         />
@@ -1803,7 +2450,9 @@ function ProductManager({
           label="IMPRESSÃO 3D"
           value={String(
             products.filter(
-              (product) => product.product_type === 'physical',
+              (product) =>
+                product.printed_enabled ??
+                product.printed_price > 0,
             ).length,
           )}
         />
@@ -1920,7 +2569,7 @@ function ProductManager({
                     updateForm('stl_price', event.target.value)
                   }
                   placeholder="19,90"
-                  required
+                  disabled={!form.stl_enabled}
                 />
               </label>
 
@@ -1934,6 +2583,7 @@ function ProductManager({
                     updateForm('compare_stl_price', event.target.value)
                   }
                   placeholder="29,90"
+                  disabled={!form.stl_enabled}
                 />
               </label>
 
@@ -1947,7 +2597,7 @@ function ProductManager({
                     updateForm('printed_price', event.target.value)
                   }
                   placeholder="69,90"
-                  required
+                  disabled={!form.printed_enabled}
                 />
               </label>
 
@@ -1961,6 +2611,7 @@ function ProductManager({
                     updateForm('compare_printed_price', event.target.value)
                   }
                   placeholder="89,90"
+                  disabled={!form.printed_enabled}
                 />
               </label>
 
@@ -1987,6 +2638,436 @@ function ProductManager({
                   rows={5}
                   required
                 />
+              </label>
+            </div>
+
+            <div className="form-section-title full-width">
+              <strong>Configuração da oferta</strong>
+              <span>
+                Estes campos controlam diretamente o conteúdo da landing page. Não use Markdown, emojis ou HTML.
+              </span>
+            </div>
+
+            <label>
+              Template da landing
+              <select
+                value={form.landing_template}
+                onChange={(event) =>
+                  updateForm(
+                    'landing_template',
+                    event.target.value as ProductLandingTemplate,
+                  )
+                }
+              >
+                <option value="product">
+                  Produto / oferta
+                </option>
+                <option value="turbo">
+                  Kit Turbo
+                </option>
+              </select>
+            </label>
+
+            <label>
+              Selo da oferta
+              <input
+                value={form.landing_badge}
+                onChange={(event) =>
+                  updateForm(
+                    'landing_badge',
+                    event.target.value,
+                  )
+                }
+                placeholder="OFERTA ESPECIAL"
+              />
+            </label>
+
+            <label>
+              Título da landing
+              <input
+                value={form.landing_title}
+                onChange={(event) =>
+                  updateForm(
+                    'landing_title',
+                    event.target.value,
+                  )
+                }
+                placeholder="Nome que aparecerá no hero"
+              />
+            </label>
+
+            <label>
+              Subtítulo principal
+              <input
+                value={form.landing_subtitle}
+                onChange={(event) =>
+                  updateForm(
+                    'landing_subtitle',
+                    event.target.value,
+                  )
+                }
+                placeholder="Uma frase curta e forte sobre o produto"
+              />
+            </label>
+
+            <label className="full-width">
+              Descrição curta do hero
+              <textarea
+                value={form.landing_description}
+                onChange={(event) =>
+                  updateForm(
+                    'landing_description',
+                    event.target.value,
+                  )
+                }
+                rows={3}
+                maxLength={260}
+                placeholder="Texto curto. Máximo recomendado: 220 caracteres."
+              />
+            </label>
+
+            <label>
+              Título da seção de benefícios
+              <input
+                value={form.landing_why_title}
+                onChange={(event) =>
+                  updateForm(
+                    'landing_why_title',
+                    event.target.value,
+                  )
+                }
+                placeholder="Por que este produto é especial?"
+              />
+            </label>
+
+            <label>
+              Texto da seção de benefícios
+              <textarea
+                value={form.landing_why_description}
+                onChange={(event) =>
+                  updateForm(
+                    'landing_why_description',
+                    event.target.value,
+                  )
+                }
+                rows={3}
+              />
+            </label>
+
+            <div className="form-section-title full-width">
+              <strong>4 benefícios da oferta</strong>
+              <span>
+                O título aparece na lista do hero e o texto aparece nos cards.
+              </span>
+            </div>
+
+            {form.landing_benefits.map(
+              (benefit, index) => (
+                <div
+                  className="full-width"
+                  key={`benefit-${index}`}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns:
+                      'minmax(0, 0.9fr) minmax(0, 1.6fr)',
+                    gap: '0.8rem',
+                  }}
+                >
+                  <label>
+                    Benefício {index + 1}
+                    <input
+                      value={benefit.title}
+                      onChange={(event) =>
+                        updateLandingBenefit(
+                          index,
+                          'title',
+                          event.target.value,
+                        )
+                      }
+                      placeholder="Ex.: Produto bem apresentado"
+                    />
+                  </label>
+
+                  <label>
+                    Descrição do benefício {index + 1}
+                    <input
+                      value={benefit.text}
+                      onChange={(event) =>
+                        updateLandingBenefit(
+                          index,
+                          'text',
+                          event.target.value,
+                        )
+                      }
+                      placeholder="Explique rapidamente o benefício."
+                    />
+                  </label>
+                </div>
+              ),
+            )}
+
+            <div className="form-section-title full-width">
+              <strong>Pontos do card de compra</strong>
+              <span>
+                Você pode ter conteúdos diferentes para STL e modelo impresso.
+              </span>
+            </div>
+
+            <div
+              className="full-width"
+              style={{
+                display: 'grid',
+                gridTemplateColumns:
+                  'repeat(2, minmax(0, 1fr))',
+                gap: '1rem',
+              }}
+            >
+              <div>
+                <strong
+                  style={{
+                    display: 'block',
+                    marginBottom: '0.65rem',
+                  }}
+                >
+                  STL
+                </strong>
+
+                {form.landing_stl_points.map(
+                  (point, index) => (
+                    <label
+                      key={`stl-point-${index}`}
+                      style={{
+                        display: 'block',
+                        marginBottom: '0.55rem',
+                      }}
+                    >
+                      Ponto {index + 1}
+                      <input
+                        value={point}
+                        onChange={(event) =>
+                          updateLandingPoint(
+                            'landing_stl_points',
+                            index,
+                            event.target.value,
+                          )
+                        }
+                      />
+                    </label>
+                  ),
+                )}
+              </div>
+
+              <div>
+                <strong
+                  style={{
+                    display: 'block',
+                    marginBottom: '0.65rem',
+                  }}
+                >
+                  Modelo impresso
+                </strong>
+
+                {form.landing_printed_points.map(
+                  (point, index) => (
+                    <label
+                      key={`printed-point-${index}`}
+                      style={{
+                        display: 'block',
+                        marginBottom: '0.55rem',
+                      }}
+                    >
+                      Ponto {index + 1}
+                      <input
+                        value={point}
+                        onChange={(event) =>
+                          updateLandingPoint(
+                            'landing_printed_points',
+                            index,
+                            event.target.value,
+                          )
+                        }
+                      />
+                    </label>
+                  ),
+                )}
+              </div>
+            </div>
+
+            <label>
+              Título da seção de detalhes
+              <input
+                value={form.landing_detail_title}
+                onChange={(event) =>
+                  updateForm(
+                    'landing_detail_title',
+                    event.target.value,
+                  )
+                }
+                placeholder="Veja os detalhes de perto."
+              />
+            </label>
+
+            <label>
+              Texto da seção de detalhes
+              <textarea
+                value={form.landing_detail_description}
+                onChange={(event) =>
+                  updateForm(
+                    'landing_detail_description',
+                    event.target.value,
+                  )
+                }
+                rows={3}
+              />
+            </label>
+
+            <div className="form-section-title full-width">
+              <strong>FAQ da oferta</strong>
+              <span>
+                Perguntas e respostas que aparecem no final da landing.
+              </span>
+            </div>
+
+            {form.landing_faq.map(
+              (faq, index) => (
+                <div
+                  className="full-width"
+                  key={`faq-${index}`}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns:
+                      'minmax(0, 0.75fr) minmax(0, 1.25fr)',
+                    gap: '0.8rem',
+                  }}
+                >
+                  <label>
+                    Pergunta {index + 1}
+                    <input
+                      value={faq.question}
+                      onChange={(event) =>
+                        updateLandingFaq(
+                          index,
+                          'question',
+                          event.target.value,
+                        )
+                      }
+                      placeholder="Ex.: Como recebo?"
+                    />
+                  </label>
+
+                  <label>
+                    Resposta {index + 1}
+                    <textarea
+                      value={faq.answer}
+                      onChange={(event) =>
+                        updateLandingFaq(
+                          index,
+                          'answer',
+                          event.target.value,
+                        )
+                      }
+                      rows={3}
+                      placeholder="Explique de forma objetiva."
+                    />
+                  </label>
+                </div>
+              ),
+            )}
+
+            <label>
+              Título do CTA final
+              <input
+                value={form.landing_final_title}
+                onChange={(event) =>
+                  updateForm(
+                    'landing_final_title',
+                    event.target.value,
+                  )
+                }
+                placeholder="Nome do produto"
+              />
+            </label>
+
+            <label>
+              Texto do CTA final
+              <input
+                value={form.landing_final_description}
+                onChange={(event) =>
+                  updateForm(
+                    'landing_final_description',
+                    event.target.value,
+                  )
+                }
+                placeholder="Uma frase final para incentivar a compra."
+              />
+            </label>
+
+            <div
+              className="full-width"
+              style={{
+                display: 'flex',
+                gap: '0.65rem',
+                flexWrap: 'wrap',
+                alignItems: 'center',
+              }}
+            >
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={openLandingPreview}
+                disabled={!form.slug.trim()}
+              >
+                <Eye size={16} />
+                VISUALIZAR OFERTA
+              </button>
+
+              <span
+                style={{
+                  fontSize: '0.82rem',
+                  opacity: 0.7,
+                }}
+              >
+                Salve o produto antes de testar a oferta no navegador.
+              </span>
+            </div>
+
+            <div className="form-section-title full-width">
+              <strong>Modalidades de venda</strong>
+              <span>
+                Desative uma modalidade quando ela não existir. Quando desativada, ela não aparece na landing e não pode ser comprada.
+              </span>
+            </div>
+
+            <div
+              className="product-flags full-width"
+              style={{ marginTop: 0 }}
+            >
+              <label className="checkbox-field">
+                <input
+                  type="checkbox"
+                  checked={form.stl_enabled}
+                  onChange={(event) =>
+                    updateForm(
+                      'stl_enabled',
+                      event.target.checked,
+                    )
+                  }
+                />
+                Vender arquivo STL
+              </label>
+
+              <label className="checkbox-field">
+                <input
+                  type="checkbox"
+                  checked={form.printed_enabled}
+                  onChange={(event) =>
+                    updateForm(
+                      'printed_enabled',
+                      event.target.checked,
+                    )
+                  }
+                />
+                Vender modelo impresso
               </label>
             </div>
 
@@ -2102,6 +3183,10 @@ function ProductManager({
           {editingProductId ? (
             <>
               <ProductMediaManager productId={editingProductId} />
+              <ProductFileManager
+                productId={editingProductId}
+                stlEnabled={form.stl_enabled}
+              />
               <ProductVariantManager productId={editingProductId} />
             </>
           ) : (
@@ -2256,6 +3341,22 @@ function ProductManager({
                           aria-label={`Editar ${product.name}`}
                         >
                           <Edit3 size={16} />
+                        </button>
+
+                        <button
+                          type="button"
+                          className="icon-button"
+                          onClick={() =>
+                            window.open(
+                              `/oferta/${product.slug}`,
+                              '_blank',
+                              'noopener,noreferrer',
+                            )
+                          }
+                          title="Visualizar landing"
+                          aria-label={`Visualizar landing de ${product.name}`}
+                        >
+                          <Eye size={16} />
                         </button>
 
                         <button

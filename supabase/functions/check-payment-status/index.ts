@@ -26,6 +26,7 @@ interface OrderRow {
   id: string;
   status: string | null;
   payment_status: string | null;
+  total: number | string | null;
 }
 
 function jsonResponse(
@@ -222,7 +223,7 @@ Deno.serve(
       } = await supabase
         .from('orders')
         .select(
-          'id,status,payment_status',
+          'id,status,payment_status,total',
         )
         .eq('id', orderId)
         .maybeSingle<OrderRow>();
@@ -273,10 +274,18 @@ Deno.serve(
         },
       );
 
+      const amount =
+        Number(order.total);
+
       return jsonResponse(
         {
           status,
           orderId: order.id,
+          amount:
+            Number.isFinite(amount)
+              ? Number(amount.toFixed(2))
+              : null,
+          currency: 'BRL',
         },
         200,
       );

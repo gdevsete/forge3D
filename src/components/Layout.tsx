@@ -153,9 +153,17 @@ const cartTotal = cartItems.reduce(
 
     onCloseCart();
 
+    // Quando o carrinho foi aberto a partir de uma landing de oferta,
+    // mantém o cliente na mesma oferta em vez de enviá-lo para a loja padrão.
+    const savedOfferPath =
+      sessionStorage.getItem('forge3d:offer-return-path');
 
+    const destination =
+      savedOfferPath && savedOfferPath.startsWith('/oferta/')
+        ? savedOfferPath
+        : '/stl';
 
-    navigate('/stl');
+    navigate(destination);
 
   }
 

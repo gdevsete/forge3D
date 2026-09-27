@@ -1,4 +1,5 @@
 let pixelInitialized = false;
+let initializedPixelId = '';
 let lastPath = '';
 
 type Fbq = ((
@@ -8,19 +9,19 @@ type Fbq = ((
   queue?: unknown[];
   loaded?: boolean;
   version?: string;
+  forge3d?: boolean;
+  disablePushState?: boolean;
 };
 
 type Attribution = {
   firstLandingPage: string;
   firstReferrer: string;
   firstVisitAt: string;
-
   utm_source: string;
   utm_medium: string;
   utm_campaign: string;
   utm_content: string;
   utm_term: string;
-
   fbclid: string;
 };
 
@@ -32,24 +33,56 @@ type PurchasePayload = {
   content_type?: string;
   num_items?: number;
   event_id?: string;
+  order_id?: string;
 };
 
-function safeWindow() {
+type StandardEvent =
+  | 'PageView'
+  | 'ViewContent'
+  | 'Search'
+  | 'AddToCart'
+  | 'AddToWishlist'
+  | 'InitiateCheckout'
+  | 'AddPaymentInfo'
+  | 'Lead'
+  | 'Contact'
+  | 'Purchase';
+
+const META_STANDARD_EVENTS = new Set<StandardEvent>([
+  'PageView',
+  'ViewContent',
+  'Search',
+  'AddToCart',
+  'AddToWishlist',
+  'InitiateCheckout',
+  'AddPaymentInfo',
+  'Lead',
+  'Contact',
+  'Purchase',
+]);
+
+function safeWindow(): boolean {
   return typeof window !== 'undefined';
 }
 
 function getFbq(): Fbq | undefined {
-  if (!safeWindow()) return undefined;
+  if (!safeWindow()) {
+    return undefined;
+  }
 
-  return (window as unknown as {
-    fbq?: Fbq;
-  }).fbq;
+  return (
+    window as unknown as {
+      fbq?: Fbq;
+    }
+  ).fbq;
 }
 
 function safeLocalStorageGet(
-  key: string
+  key: string,
 ): string | null {
-  if (!safeWindow()) return null;
+  if (!safeWindow()) {
+    return null;
+  }
 
   try {
     return window.localStorage.getItem(key);
@@ -60,29 +93,32 @@ function safeLocalStorageGet(
 
 function safeLocalStorageSet(
   key: string,
-  value: string
-) {
-  if (!safeWindow()) return;
+  value: string,
+): void {
+  if (!safeWindow()) {
+    return;
+  }
 
   try {
     window.localStorage.setItem(
       key,
-      value
+      value,
     );
   } catch {
-    // Não interrompe o funcionamento
-    // caso o localStorage esteja indisponível.
+    // Storage indisponível não pode quebrar o checkout.
   }
 }
 
 function safeSessionStorageGet(
-  key: string
+  key: string,
 ): string | null {
-  if (!safeWindow()) return null;
+  if (!safeWindow()) {
+    return null;
+  }
 
   try {
     return window.sessionStorage.getItem(
-      key
+      key,
     );
   } catch {
     return null;
@@ -91,23 +127,25 @@ function safeSessionStorageGet(
 
 function safeSessionStorageSet(
   key: string,
-  value: string
-) {
-  if (!safeWindow()) return;
+  value: string,
+): void {
+  if (!safeWindow()) {
+    return;
+  }
 
   try {
     window.sessionStorage.setItem(
       key,
-      value
+      value,
     );
   } catch {
-    // Ignora falhas de sessionStorage.
+    // Storage indisponível não pode quebrar o checkout.
   }
 }
 
 function generateEventId(
-  prefix = 'forge3d'
-) {
+  prefix = 'forge3d',
+): string {
   if (
     safeWindow() &&
     typeof window.crypto !==
@@ -121,6 +159,55 @@ function generateEventId(
   return `${prefix}_${Date.now()}_${Math.random()
     .toString(36)
     .slice(2, 12)}`;
+}
+
+function stablePayloadKey(
+  payload: Record<string, unknown>,
+): string {
+  return JSON.stringify(
+    Object.keys(payload)
+      .sort()
+      .reduce<Record<string, unknown>>(
+        (result, key) => {
+          result[key] = payload[key];
+          return result;
+        },
+        {},
+      ),
+  );
+}
+
+function recentEventWasSent(
+  key: string,
+  windowMs: number,
+): boolean {
+  const storageKey = `forge3d_event_dedupe_${key}`;
+  const existing =
+    safeSessionStorageGet(storageKey);
+
+  if (!existing) {
+    safeSessionStorageSet(
+      storageKey,
+      String(Date.now()),
+    );
+    return false;
+  }
+
+  const timestamp =
+    Number(existing);
+
+  if (
+    !Number.isFinite(timestamp) ||
+    Date.now() - timestamp > windowMs
+  ) {
+    safeSessionStorageSet(
+      storageKey,
+      String(Date.now()),
+    );
+    return false;
+  }
+
+  return true;
 }
 
 export function getAttribution(): Attribution {
@@ -140,7 +227,7 @@ export function getAttribution(): Attribution {
 
   const params =
     new URLSearchParams(
-      window.location.search
+      window.location.search,
     );
 
   let existing: Partial<Attribution> =
@@ -149,8 +236,8 @@ export function getAttribution(): Attribution {
   try {
     existing = JSON.parse(
       safeLocalStorageGet(
-        'forge3d_attribution'
-      ) || '{}'
+        'forge3d_attribution',
+      ) || '{}',
     );
   } catch {
     existing = {};
@@ -203,30 +290,53 @@ export function getAttribution(): Attribution {
 
   safeLocalStorageSet(
     'forge3d_attribution',
-    JSON.stringify(current)
+    JSON.stringify(current),
   );
 
   return current;
 }
 
 export function initMetaPixel(
-  pixelId: string
-) {
+  pixelId: string,
+): void {
   if (
     !safeWindow() ||
-    !pixelId ||
-    pixelInitialized
+    !pixelId
   ) {
     return;
   }
 
-  const w = window as unknown as {
-    fbq?: Fbq;
-    _fbq?: Fbq;
-  };
+  if (
+    pixelInitialized &&
+    initializedPixelId === pixelId
+  ) {
+    return;
+  }
 
+  const w =
+    window as unknown as {
+      fbq?: Fbq;
+      _fbq?: Fbq;
+    };
+
+  // Não cria uma segunda instância caso outro script já tenha
+  // inicializado o pixel na mesma página.
   if (w.fbq) {
+    if (
+      w.fbq.forge3d &&
+      initializedPixelId === pixelId
+    ) {
+      pixelInitialized = true;
+      return;
+    }
+
+    console.warn(
+      '[Forge3D] Meta Pixel já existe na página. Verifique se há outro snippet/integração carregando o Pixel.',
+    );
+
     pixelInitialized = true;
+    initializedPixelId =
+      pixelId;
     return;
   }
 
@@ -240,37 +350,67 @@ export function initMetaPixel(
     }
   }) as Fbq;
 
-  f.callMethod = undefined;
+  f.callMethod =
+    undefined;
   f.queue = [];
   f.loaded = true;
   f.version = '2.0';
+  f.forge3d = true;
 
   w.fbq = f;
   w._fbq = f;
 
   const script =
     document.createElement(
-      'script'
+      'script',
     );
 
   script.async = true;
-
   script.src =
     'https://connect.facebook.net/en_US/fbevents.js';
 
   document.head.appendChild(
-    script
+    script,
   );
 
-  f('init', pixelId);
+  /*
+   * Controle deliberadamente manual.
+   *
+   * A Meta documenta que a configuração automática pode detectar
+   * interações/cliques. Aqui optamos por desligá-la para que o
+   * funil comercial tenha somente os eventos que o código define.
+   */
+  f(
+    'set',
+    'autoConfig',
+    false,
+    pixelId,
+  );
+
+  /*
+   * O React Router já controla as mudanças de URL e o projeto
+   * envia PageView manualmente. O Meta Pixel espera esta
+   * configuração como propriedade da função fbq, não como
+   * um comando `set` com valor booleano.
+   */
+  f.disablePushState = true;
+
+  f(
+    'init',
+    pixelId,
+  );
 
   pixelInitialized = true;
+  initializedPixelId =
+    pixelId;
 }
 
 export function trackPageView(
-  path: string
-) {
-  if (!safeWindow()) return;
+  path: string,
+): void {
+  if (!safeWindow()) {
+    return;
+  }
 
   if (path === lastPath) {
     return;
@@ -280,26 +420,49 @@ export function trackPageView(
 
   getFbq()?.(
     'track',
-    'PageView'
+    'PageView',
   );
 
-  pushEvent(
+  recordEvent(
     'PageView',
-    {
-      path,
-    }
+    { path },
   );
 }
 
 export function trackEvent(
   event: string,
-  payload: Record<
-    string,
-    unknown
-  > = {},
-  eventId?: string
-) {
-  if (!safeWindow()) return;
+  payload: Record<string, unknown> = {},
+  eventId?: string,
+): string | undefined {
+  if (!safeWindow()) {
+    return undefined;
+  }
+
+  // Somente eventos padrão são enviados para o Pixel por esta API.
+  // Eventos auxiliares permanecem no log local.
+  if (
+    !META_STANDARD_EVENTS.has(
+      event as StandardEvent,
+    )
+  ) {
+    console.warn(
+      `[Forge3D] Evento "${event}" não é padrão e não será enviado ao Meta Pixel por trackEvent().`,
+    );
+
+    recordEvent(
+      event,
+      {
+        ...payload,
+        event_id:
+          eventId ||
+          generateEventId(
+            event,
+          ),
+      },
+    );
+
+    return undefined;
+  }
 
   const id =
     eventId ||
@@ -314,28 +477,21 @@ export function trackEvent(
       payload,
       {
         eventID: id,
-      }
+      },
     );
   }
 
-  pushEvent(
+  recordEvent(
     event,
     {
       ...payload,
       event_id: id,
-    }
+    },
   );
 
   return id;
 }
 
-/**
- * Visualização de produto.
- *
- * Proteção contra duplicação imediata,
- * especialmente durante React StrictMode
- * em desenvolvimento.
- */
 export function trackViewContent(
   payload: {
     content_ids?: string[];
@@ -343,32 +499,29 @@ export function trackViewContent(
     content_type?: string;
     value?: number;
     currency?: string;
-  }
-) {
+  },
+): string | undefined {
   const productId =
     payload.content_ids?.[0] ||
     payload.content_name ||
     'unknown';
 
-  const storageKey =
-    `forge3d_viewcontent_${productId}`;
+  const path =
+    safeWindow()
+      ? window.location.pathname
+      : '';
 
-  /*
-   * Se este produto já foi registrado
-   * nesta sessão, não dispara novamente.
-   */
+  const dedupeKey =
+    `viewcontent_${path}_${productId}`;
+
   if (
-    safeSessionStorageGet(
-      storageKey
+    recentEventWasSent(
+      dedupeKey,
+      1500,
     )
   ) {
-    return;
+    return undefined;
   }
-
-  safeSessionStorageSet(
-    storageKey,
-    '1'
-  );
 
   return trackEvent(
     'ViewContent',
@@ -380,7 +533,7 @@ export function trackViewContent(
         'BRL',
 
       ...payload,
-    }
+    },
   );
 }
 
@@ -388,13 +541,13 @@ export function trackSearch(
   payload: {
     search_string: string;
     content_category?: string;
-  }
-) {
+  },
+): string | undefined {
   return trackEvent(
     'Search',
     {
       ...payload,
-    }
+    },
   );
 }
 
@@ -406,19 +559,40 @@ export function trackAddToCart(
     value: number;
     currency?: string;
     num_items?: number;
+  },
+): string | undefined {
+  const key =
+    `addtocart_${stablePayloadKey(
+      {
+        content_ids:
+          payload.content_ids,
+        content_type:
+          payload.content_type,
+        value:
+          payload.value,
+        num_items:
+          payload.num_items,
+      },
+    )}`;
+
+  if (
+    recentEventWasSent(
+      key,
+      1200,
+    )
+  ) {
+    return undefined;
   }
-) {
+
   return trackEvent(
     'AddToCart',
     {
       content_type:
         'product',
-
       currency:
         'BRL',
-
       ...payload,
-    }
+    },
   );
 }
 
@@ -429,19 +603,17 @@ export function trackAddToWishlist(
     content_type?: string;
     value?: number;
     currency?: string;
-  }
-) {
+  },
+): string | undefined {
   return trackEvent(
     'AddToWishlist',
     {
       content_type:
         'product',
-
       currency:
         'BRL',
-
       ...payload,
-    }
+    },
   );
 }
 
@@ -451,16 +623,36 @@ export function trackInitiateCheckout(
     value: number;
     currency?: string;
     num_items?: number;
+  },
+): string | undefined {
+  const key =
+    `initcheckout_${stablePayloadKey(
+      {
+        content_ids:
+          payload.content_ids,
+        value:
+          payload.value,
+        num_items:
+          payload.num_items,
+      },
+    )}`;
+
+  if (
+    recentEventWasSent(
+      key,
+      2500,
+    )
+  ) {
+    return undefined;
   }
-) {
+
   return trackEvent(
     'InitiateCheckout',
     {
       currency:
         'BRL',
-
       ...payload,
-    }
+    },
   );
 }
 
@@ -469,16 +661,34 @@ export function trackAddPaymentInfo(
     value?: number;
     currency?: string;
     content_ids?: string[];
+  },
+): string | undefined {
+  const key =
+    `addpaymentinfo_${stablePayloadKey(
+      {
+        content_ids:
+          payload.content_ids,
+        value:
+          payload.value,
+      },
+    )}`;
+
+  if (
+    recentEventWasSent(
+      key,
+      5000,
+    )
+  ) {
+    return undefined;
   }
-) {
+
   return trackEvent(
     'AddPaymentInfo',
     {
       currency:
         'BRL',
-
       ...payload,
-    }
+    },
   );
 }
 
@@ -487,13 +697,36 @@ export function trackLead(
     content_name?: string;
     value?: number;
     currency?: string;
+    event_id?: string;
+  },
+): string | undefined {
+  const key =
+    `lead_${stablePayloadKey(
+      {
+        content_name:
+          payload.content_name,
+        value:
+          payload.value,
+        event_id:
+          payload.event_id,
+      },
+    )}`;
+
+  if (
+    recentEventWasSent(
+      key,
+      5000,
+    )
+  ) {
+    return undefined;
   }
-) {
+
   return trackEvent(
     'Lead',
     {
       ...payload,
-    }
+    },
+    payload.event_id,
   );
 }
 
@@ -501,111 +734,139 @@ export function trackContact(
   payload: {
     content_name?: string;
     content_category?: string;
-  }
-) {
+  },
+): string | undefined {
   return trackEvent(
     'Contact',
     {
       ...payload,
-    }
+    },
   );
 }
 
-/**
- * Purchase.
- *
- * IMPORTANTE:
- *
- * Esta função deve ser chamada somente
- * após confirmação real do pagamento.
- *
- * Nunca no simples clique do botão
- * de pagamento.
- */
 export function trackPurchase(
-  payload: PurchasePayload
-) {
+  payload: PurchasePayload,
+): string | undefined {
   const eventId =
     payload.event_id ||
-    generateEventId(
-      'purchase'
-    );
-
-  const {
-    event_id: _eventId,
-    ...purchaseData
-  } = payload;
+    (payload.order_id
+      ? `purchase_${payload.order_id}`
+      : generateEventId('purchase'));
 
   return trackEvent(
     'Purchase',
     {
       currency:
         'BRL',
-
-      ...purchaseData,
+      ...payload,
     },
-    eventId
+    eventId,
   );
 }
 
+export function trackPurchaseOnce(
+  payload: PurchasePayload & {
+    order_id: string;
+  },
+): string | undefined {
+  const orderId =
+    payload.order_id.trim();
+
+  if (!orderId) {
+    console.error(
+      '[Forge3D] Purchase sem order_id não foi enviado.',
+    );
+    return undefined;
+  }
+
+  const storageKey =
+    `forge3d_purchase_sent_${orderId}`;
+
+  if (
+    safeLocalStorageGet(
+      storageKey,
+    )
+  ) {
+    return undefined;
+  }
+
+  /*
+   * Se o Pixel ainda não foi inicializado, não marcamos a compra
+   * como enviada. Assim, uma falha de configuração/carregamento
+   * não "queima" a tentativa para sempre.
+   */
+  if (!getFbq()) {
+    console.warn(
+      '[Forge3D] Purchase aguardando Pixel inicializado.',
+    );
+    return undefined;
+  }
+
+  const eventId =
+    payload.event_id ||
+    `purchase_${orderId}`;
+
+  const result =
+    trackPurchase({
+      ...payload,
+      order_id:
+        orderId,
+      event_id:
+        eventId,
+    });
+
+  /*
+   * Marca somente depois de entregar o evento ao fbq.
+   */
+  safeLocalStorageSet(
+    storageKey,
+    new Date().toISOString(),
+  );
+
+  return result;
+}
+
+/**
+ * Mantida para compatibilidade com partes antigas.
+ * Não envia eventos customizados para o Meta Pixel.
+ * Registra apenas localmente para diagnóstico.
+ */
 export function trackCustom(
   event: string,
-  payload: Record<
-    string,
-    unknown
-  > = {},
-  eventId?: string
-) {
-  if (!safeWindow()) return;
-
+  payload: Record<string, unknown> = {},
+  eventId?: string,
+): string | undefined {
   const id =
     eventId ||
     generateEventId(event);
 
-  const fb = getFbq();
-
-  if (fb) {
-    fb(
-      'trackCustom',
-      event,
-      payload,
-      {
-        eventID: id,
-      }
-    );
-  }
-
-  pushEvent(
+  recordEvent(
     event,
     {
       ...payload,
       event_id: id,
-    }
+    },
   );
 
   return id;
 }
 
-function pushEvent(
+function recordEvent(
   event: string,
-  payload: Record<
-    string,
-    unknown
-  >
-) {
-  if (!safeWindow()) return;
+  payload: Record<string, unknown>,
+): void {
+  if (!safeWindow()) {
+    return;
+  }
 
   const attribution =
     getAttribution();
 
   const item = {
     event,
-
     payload: {
       ...payload,
-
       attribution,
-
       timestamp:
         new Date().toISOString(),
     },
@@ -615,14 +876,17 @@ function pushEvent(
     [];
 
   try {
-    existing = JSON.parse(
-      safeLocalStorageGet(
-        'forge3d_events'
-      ) || '[]'
-    );
+    existing =
+      JSON.parse(
+        safeLocalStorageGet(
+          'forge3d_events',
+        ) || '[]',
+      );
 
     if (
-      !Array.isArray(existing)
+      !Array.isArray(
+        existing,
+      )
     ) {
       existing = [];
     }
@@ -635,26 +899,35 @@ function pushEvent(
   safeLocalStorageSet(
     'forge3d_events',
     JSON.stringify(
-      existing.slice(-500)
-    )
+      existing.slice(-500),
+    ),
   );
 }
 
+/*
+ * Os três trackers abaixo permanecem compatíveis com main.tsx,
+ * mas são apenas diagnóstico local. Eles não mandam eventos
+ * customizados para o Meta Pixel.
+ */
 export function setupGlobalInteractionTracking() {
   if (!safeWindow()) {
     return () => {};
   }
 
   const handler = (
-    event: MouseEvent
+    event: MouseEvent,
   ) => {
     const target =
-      event.target as HTMLElement | null;
+      event.target as
+        | HTMLElement
+        | null;
 
     const element =
       target?.closest(
-        '[data-track]'
-      ) as HTMLElement | null;
+        '[data-track]',
+      ) as
+        | HTMLElement
+        | null;
 
     if (!element) {
       return;
@@ -664,28 +937,28 @@ export function setupGlobalInteractionTracking() {
       'ForgeInteraction',
       {
         action:
-          element.dataset.track ||
-          '',
-
+          element.dataset
+            .track || '',
         label:
-          element.dataset.trackLabel ||
+          element.dataset
+            .trackLabel ||
           element.textContent
             ?.trim()
             .slice(0, 80) ||
           '',
-      }
+      },
     );
   };
 
   document.addEventListener(
     'click',
-    handler
+    handler,
   );
 
   return () =>
     document.removeEventListener(
       'click',
-      handler
+      handler,
     );
 }
 
@@ -695,13 +968,16 @@ export function setupFormInteractionTracking() {
   }
 
   const handler = (
-    event: SubmitEvent
+    event: SubmitEvent,
   ) => {
     const form =
-      event.target as HTMLFormElement | null;
+      event.target as
+        | HTMLFormElement
+        | null;
 
     if (
-      !form?.dataset.trackForm
+      !form?.dataset
+        .trackForm
     ) {
       return;
     }
@@ -710,20 +986,21 @@ export function setupFormInteractionTracking() {
       'ForgeFormInteraction',
       {
         form:
-          form.dataset.trackForm,
-      }
+          form.dataset
+            .trackForm,
+      },
     );
   };
 
   document.addEventListener(
     'submit',
-    handler
+    handler,
   );
 
   return () =>
     document.removeEventListener(
       'submit',
-      handler
+      handler,
     );
 }
 
@@ -743,22 +1020,17 @@ export function setupScrollTracking() {
       Math.max(
         doc.scrollHeight -
           window.innerHeight,
-        1
+        1,
       );
 
     const depth =
       Math.round(
         (window.scrollY /
           total) *
-          100
+          100,
       );
 
-    [
-      25,
-      50,
-      75,
-      90,
-    ].forEach(
+    [25, 50, 75, 90].forEach(
       (mark) => {
         if (
           depth >= mark &&
@@ -769,12 +1041,11 @@ export function setupScrollTracking() {
           trackCustom(
             'ScrollDepth',
             {
-              percent:
-                mark,
-            }
+              percent: mark,
+            },
           );
         }
-      }
+      },
     );
   };
 
@@ -783,12 +1054,12 @@ export function setupScrollTracking() {
     handler,
     {
       passive: true,
-    }
+    },
   );
 
   return () =>
     window.removeEventListener(
       'scroll',
-      handler
+      handler,
     );
 }

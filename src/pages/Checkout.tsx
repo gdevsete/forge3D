@@ -1,6 +1,7 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import type {
@@ -36,7 +37,10 @@ import {
 
 import {
   getAttribution,
-  trackEvent,
+  trackAddPaymentInfo,
+  trackLead,
+  trackPurchaseOnce,
+  trackCustom,
 } from '../lib/analytics';
 
 import {
@@ -162,6 +166,9 @@ export function Checkout({
   const [copied, setCopied] =
     useState(false);
 
+  const purchaseSentRef =
+    useRef(false);
+
   const physical = items.some(
     (item) =>
       item.purchaseType === 'physical',
@@ -207,7 +214,14 @@ export function Checkout({
       return;
     }
 
-    const orderId = pixPayment.orderId;
+    const currentPixPayment = pixPayment;
+    const rawOrderId = currentPixPayment.orderId;
+
+    if (typeof rawOrderId !== 'string' || !rawOrderId.trim()) {
+      return;
+    }
+
+    const orderId: string = rawOrderId.trim();
 
     let cancelled = false;
     let checking = false;
@@ -241,13 +255,70 @@ export function Checkout({
           typeof data === 'object'
             ? (data as {
                 status?: unknown;
+                amount?: unknown;
               }).status
             : undefined;
+
+        const responseAmount =
+          data &&
+          typeof data === 'object'
+            ? Number(
+                (data as {
+                  amount?: unknown;
+                }).amount,
+              )
+            : Number.NaN;
+
+        const confirmedAmount =
+          Number.isFinite(
+            responseAmount,
+          ) &&
+          responseAmount > 0
+            ? responseAmount
+            : Number(
+                currentPixPayment.amount,
+              );
 
         if (
           !cancelled &&
           responseStatus === 'paid'
         ) {
+          if (
+            !purchaseSentRef.current &&
+            Number.isFinite(
+              confirmedAmount,
+            ) &&
+            confirmedAmount > 0
+          ) {
+            trackPurchaseOnce({
+              order_id:
+                orderId,
+              value:
+                confirmedAmount,
+              currency: 'BRL',
+              content_ids:
+                items.map(
+                  (item) =>
+                    item.product.id,
+                ),
+              content_name:
+                items
+                  .map(
+                    (item) =>
+                      item.product.name,
+                  )
+                  .join(', '),
+              content_type:
+                'product',
+              num_items:
+                getCartQuantity(items),
+              event_id:
+                `purchase_${orderId}`,
+            });
+
+            purchaseSentRef.current = true;
+          }
+
           setStatus(
             'delivery-preparing',
           );
@@ -438,6 +509,14 @@ export function Checkout({
     e.preventDefault();
 
     if (
+      status === 'loading' ||
+      status === 'payment-created' ||
+      status === 'delivery-preparing'
+    ) {
+      return;
+    }
+
+    if (
       !form.name.trim() ||
       !form.email.trim()
     ) {
@@ -477,27 +556,14 @@ export function Checkout({
      * ==========================================================
      */
 
-    trackEvent(
-      'Lead',
-      {
-        content_name:
-          'Checkout Forge3D',
-
-        value:
-          checkoutTotal,
-
-        currency:
-          'BRL',
-
-        shipping_method:
-          physical
-            ? shippingMethod
-            : 'digital',
-
-        shipping:
-          shippingCost,
-      },
-    );
+    trackLead({
+      content_name:
+        'Checkout Forge3D',
+      value:
+        checkoutTotal,
+      currency:
+        'BRL',
+    });
 
     try {
       await saveLead({
@@ -540,32 +606,17 @@ export function Checkout({
      * ==========================================================
      */
 
-    trackEvent(
-      'AddPaymentInfo',
-      {
-        value:
-          checkoutTotal,
-
-        currency:
-          'BRL',
-
-        content_ids:
-          items.map(
-            (item) => item.product.id,
-          ),
-
-        num_items:
-          getCartQuantity(items),
-
-        shipping_method:
-          physical
-            ? shippingMethod
-            : 'digital',
-
-        shipping:
-          shippingCost,
-      },
-    );
+    trackAddPaymentInfo({
+      value:
+        checkoutTotal,
+      currency:
+        'BRL',
+      content_ids:
+        items.map(
+          (item) =>
+            item.product.id,
+        ),
+    });
 
     /*
      * ==========================================================
@@ -739,7 +790,7 @@ export function Checkout({
          * foi efetivamente criado.
          */
 
-        trackEvent(
+        trackCustom(
           'PixGenerated',
           {
             value:
@@ -751,7 +802,8 @@ export function Checkout({
 
             content_ids:
               items.map(
-                (item) => item.product.id,
+                (item) =>
+                  item.product.id,
               ),
 
             num_items:
@@ -803,6 +855,47 @@ export function Checkout({
           expiresAt:
             result.expiresAt,
         });
+
+        const paidAmount =
+          Number(result.amount);
+
+        if (
+          !purchaseSentRef.current &&
+          result.orderId &&
+          Number.isFinite(
+            paidAmount,
+          ) &&
+          paidAmount > 0
+        ) {
+          trackPurchaseOnce({
+            order_id:
+              result.orderId,
+            value:
+              paidAmount,
+            currency:
+              'BRL',
+            content_ids:
+              items.map(
+                (item) =>
+                  item.product.id,
+              ),
+            content_name:
+              items
+                .map(
+                  (item) =>
+                    item.product.name,
+                )
+                .join(', '),
+            content_type:
+              'product',
+            num_items:
+              getCartQuantity(items),
+            event_id:
+              `purchase_${result.orderId}`,
+          });
+
+          purchaseSentRef.current = true;
+        }
 
         setStatus(
           'delivery-preparing',
