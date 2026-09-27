@@ -1926,37 +1926,6 @@ function ProductManager({
     setSaving(true);
 
     try {
-      if (
-        editingProductId &&
-        form.active &&
-        form.stl_enabled
-      ) {
-        const {
-          count: stlFileCount,
-          error: stlFileCountError,
-        } = await supabase
-          .from('product_files')
-          .select('id', {
-            count: 'exact',
-            head: true,
-          })
-          .eq(
-            'product_id',
-            editingProductId,
-          );
-
-        if (stlFileCountError) {
-          throw stlFileCountError;
-        }
-
-        if (!stlFileCount) {
-          setError(
-            'O STL está habilitado, mas não existe arquivo STL cadastrado. Envie o arquivo antes de publicar o produto.',
-          );
-          return;
-        }
-      }
-
       if (!editingProductId) {
         const { data: slugExists, error: slugError } =
           await supabase
@@ -2118,11 +2087,7 @@ function ProductManager({
           ) || null,
 
         active:
-          form.active &&
-          (
-            !form.stl_enabled ||
-            Boolean(editingProductId)
-          ),
+          form.active,
         featured: form.featured,
         is_new: form.is_new,
         is_best_seller:
