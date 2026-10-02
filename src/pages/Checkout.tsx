@@ -44,8 +44,8 @@ import {
 } from '../lib/analytics';
 
 import {
-  createStreetPayPayment,
-} from '../lib/streetpay';
+  createPurinCashPayment,
+} from '../lib/purincash';
 
 import {
   saveLead,
@@ -201,7 +201,7 @@ export function Checkout({
    * Enquanto isso, consultamos o backend a cada 4 segundos.
    *
    * O Edge Function usa o orderId para ler o status real do
-   * pedido no Supabase, já atualizado pelo webhook da StreetPay.
+   * pedido no Supabase, já atualizado pelo webhook da PurinCash.
    *
    * Quando o status chega em "paid", trocamos automaticamente
    * para a tela de entrega digital / preparação do pedido.
@@ -735,7 +735,7 @@ export function Checkout({
       };
 
       const result =
-        await createStreetPayPayment(
+        await createPurinCashPayment(
           paymentRequest,
         );
 
@@ -922,7 +922,7 @@ export function Checkout({
       if (
         error instanceof Error &&
         error.message ===
-          'STREETPAY_NOT_CONFIGURED'
+          'PURINCASH_NOT_CONFIGURED'
       ) {
         setStatus(
           'not-configured',
