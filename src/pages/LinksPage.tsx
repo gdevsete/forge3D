@@ -1,276 +1,137 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { siInstagram, siWhatsapp } from 'simple-icons';
 
-import { supabase } from '../lib/supabase';
-
-type LinkHubTone =
-  | 'orange'
-  | 'red'
-  | 'blue'
-  | 'purple'
-  | 'green'
-  | 'yellow';
-
-type LinkHubProduct = {
-  id: string;
-  name: string;
-  slug: string;
-  thumbnail_url: string | null;
-  landing_badge: string | null;
-  landing_title: string | null;
-  landing_subtitle: string | null;
-  active: boolean;
-  created_at: string;
-};
-
-const TONES: LinkHubTone[] = [
-  'orange',
-  'red',
-  'blue',
-  'purple',
-  'green',
-  'yellow',
-];
-
-function toneForIndex(index: number): LinkHubTone {
-  return TONES[index % TONES.length];
+function InstagramIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="forge-contact-icon"
+    >
+      <path d={siInstagram.path} fill="currentColor" />
+    </svg>
+  );
 }
 
-function cleanText(value: string | null | undefined): string {
-  return typeof value === 'string' ? value.trim() : '';
+function WhatsAppIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="forge-contact-icon forge-whatsapp-icon"
+    >
+      <path d={siWhatsapp.path} fill="currentColor" />
+    </svg>
+  );
 }
 
 export function LinksPage() {
-  const [products, setProducts] = useState<LinkHubProduct[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let mounted = true;
-
-    async function loadLinkHub() {
-      try {
-        setLoading(true);
-        setError(null);
-
-        const { data, error: productsError } = await supabase
-          .from('products')
-          .select(
-            [
-              'id',
-              'name',
-              'slug',
-              'thumbnail_url',
-              'landing_badge',
-              'landing_title',
-              'landing_subtitle',
-              'active',
-              'created_at',
-            ].join(','),
-          )
-          .eq('active', true)
-          .order('created_at', { ascending: false });
-
-        if (productsError) {
-          throw productsError;
-        }
-
-        // O projeto atual não expõe o schema completo do Supabase
-        // ao TypeScript. A consulta funciona em runtime, então
-        // tipamos explicitamente o retorno antes de transformá-lo.
-        const rows = (data ?? []) as unknown as LinkHubProduct[];
-
-        const validOffers = rows
-          .filter(
-            (item) =>
-              typeof item.slug === 'string' &&
-              item.slug.trim().length > 0,
-          )
-          .map((item) => ({
-            id: String(item.id),
-            name: String(item.name ?? ''),
-            slug: String(item.slug).trim(),
-            thumbnail_url:
-              typeof item.thumbnail_url === 'string' &&
-              item.thumbnail_url.trim()
-                ? item.thumbnail_url.trim()
-                : null,
-            landing_badge:
-              typeof item.landing_badge === 'string'
-                ? item.landing_badge.trim()
-                : null,
-            landing_title:
-              typeof item.landing_title === 'string'
-                ? item.landing_title.trim()
-                : null,
-            landing_subtitle:
-              typeof item.landing_subtitle === 'string'
-                ? item.landing_subtitle.trim()
-                : null,
-            active: Boolean(item.active),
-            created_at: String(item.created_at ?? ''),
-          }));
-
-        if (mounted) {
-          setProducts(validOffers);
-        }
-      } catch (loadError) {
-        console.error(
-          '[Forge3D] Erro ao carregar central de ofertas:',
-          loadError,
-        );
-
-        if (mounted) {
-          setError(
-            'Não foi possível carregar as ofertas da Forge3D.',
-          );
-        }
-      } finally {
-        if (mounted) {
-          setLoading(false);
-        }
-      }
-    }
-
-    void loadLinkHub();
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  const visibleProducts = useMemo(
-    () => products.filter((product) => product.active),
-    [products],
-  );
-
   return (
     <main
       className="forge-links-page"
-      aria-label="Central de ofertas Forge3D"
+      aria-label="Central de links Forge3D"
     >
-      <div
-        className="forge-links-phone"
-        aria-label="Central de links Forge3D"
-      >
-        <div
-          className="forge-links-topbar"
-          aria-hidden="true"
-        >
-          <span />
-          <span />
-          <span />
-        </div>
-
+      <div className="forge-links-shell">
         <div className="forge-links-content">
-          <div
-            className="forge-links-brand"
-            aria-label="Forge3D"
-          >
-            <span className="forge-links-mark">
-              F
-            </span>
-            <span>
-              FORGE<span>3D</span>
-            </span>
-          </div>
+          <header className="forge-links-header">
+            <div className="forge-links-brand">
+              <img
+                src="https://eqygfzdowcligbvlcixk.supabase.co/storage/v1/object/public/product-media/LOGOFORGE3D-removebg-preview%20(1).png"
+                alt="R&G Forge3D — impressão, design e personalização"
+              />
+            </div>
+          </header>
 
           <section className="forge-links-hero">
-            <div
-              className="forge-links-hero-art"
-              aria-hidden="true"
-            />
-
             <div className="forge-links-hero-copy">
+              <span className="forge-links-eyebrow">
+                CRIE. IMPRIMA. SURPREENDA.
+              </span>
               <h1>
-                ARQUIVOS STL E
-                <strong>PEÇAS IMPRESSAS EM 3D</strong>
+                Seu próximo projeto
+                <strong>começa aqui.</strong>
               </h1>
-
               <p>
-                PROJETOS EXCLUSIVOS&nbsp;&nbsp;•&nbsp;&nbsp;
-                ALTA QUALIDADE&nbsp;&nbsp;•&nbsp;&nbsp;
-                ENTREGA RÁPIDA
+                Arquivos STL e impressão 3D para transformar suas ideias em peças reais.
               </p>
+            </div>
+            <div
+              className="forge-links-orbit"
+              aria-hidden="true"
+            >
+              <span />
+              <span />
+              <span />
             </div>
           </section>
 
-          {loading ? (
-            <p className="forge-links-status">
-              CARREGANDO OFERTAS...
-            </p>
-          ) : null}
-
-          {error ? (
-            <p
-              className="forge-links-status forge-links-status-error"
-              role="alert"
-            >
-              {error}
-            </p>
-          ) : null}
-
-          {!loading && !error && visibleProducts.length === 0 ? (
-            <div className="forge-links-empty">
-              <strong>Nenhuma oferta disponível.</strong>
-              <small>
-                Cadastre um produto ativo no Admin para ele aparecer aqui
-                automaticamente.
-              </small>
+          <section className="forge-contact-section" aria-labelledby="forge-contact-title">
+            <div className="forge-contact-heading">
+              <span className="forge-links-eyebrow">VAMOS CONVERSAR</span>
+              <h2 id="forge-contact-title">Fale com a Forge3D</h2>
+              <p>Escolha por onde prefere chamar a gente.</p>
             </div>
-          ) : null}
 
-          <nav
-            className="forge-links-list"
-            aria-label="Ofertas Forge3D"
-          >
-            {visibleProducts.map((product, index) => {
-              const tone = toneForIndex(index);
-              const title =
-                cleanText(product.landing_title) ||
-                cleanText(product.name);
-              const subtitle =
-                cleanText(product.landing_subtitle) ||
-                cleanText(product.landing_badge) ||
-                'Confira esta oferta da Forge3D';
+            <div className="forge-contact-list">
+              <a
+                className="forge-contact-card forge-contact-instagram"
+                href="https://www.instagram.com/rgforge3d/"
+                target="_blank"
+                rel="noreferrer"
+                aria-label="Abrir Instagram @rgforge3d"
+              >
+                <span className="forge-contact-icon-wrap">
+                  <InstagramIcon />
+                </span>
+                <span className="forge-contact-copy">
+                  <strong>Instagram</strong>
+                  <small>@rgforge3d</small>
+                </span>
+                <span className="forge-contact-arrow" aria-hidden="true">↗</span>
+              </a>
 
-              return (
-                <Link
-                  key={product.id}
-                  to={`/oferta/${encodeURIComponent(product.slug)}`}
-                  className={`forge-link-card forge-link-${tone}`}
-                  aria-label={`${title}: ${subtitle}`}
-                >
-                  <span className="forge-link-thumb">
-                    {product.thumbnail_url ? (
-                      <img
-                        src={product.thumbnail_url}
-                        alt={title}
-                        loading={index < 3 ? 'eager' : 'lazy'}
-                      />
-                    ) : (
-                      <span
-                        className="forge-link-thumb-empty"
-                        aria-hidden="true"
-                      />
-                    )}
-                  </span>
+              <a
+                className="forge-contact-card forge-contact-whatsapp"
+                href="https://wa.me/5563992028137"
+                target="_blank"
+                rel="noreferrer"
+                aria-label="Conversar com Guilherme Oliveira pelo WhatsApp"
+              >
+                <span className="forge-contact-icon-wrap">
+                  <WhatsAppIcon />
+                </span>
+                <span className="forge-contact-copy">
+                  <strong>Guilherme Oliveira</strong>
+                  <small>WhatsApp</small>
+                </span>
+                <span className="forge-contact-arrow" aria-hidden="true">↗</span>
+              </a>
 
-                  <span className="forge-link-copy">
-                    <strong>{title.toUpperCase()}</strong>
-                    <small>{subtitle}</small>
-                  </span>
+              <a
+                className="forge-contact-card forge-contact-whatsapp"
+                href="https://wa.me/5563992099150"
+                target="_blank"
+                rel="noreferrer"
+                aria-label="Conversar com Rayara Soares pelo WhatsApp"
+              >
+                <span className="forge-contact-icon-wrap">
+                  <WhatsAppIcon />
+                </span>
+                <span className="forge-contact-copy">
+                  <strong>Rayara Soares</strong>
+                  <small>WhatsApp</small>
+                </span>
+                <span className="forge-contact-arrow" aria-hidden="true">↗</span>
+              </a>
+            </div>
+          </section>
 
-                  <span
-                    className="forge-link-arrow"
-                    aria-hidden="true"
-                  >
-                    →
-                  </span>
-                </Link>
-              );
-            })}
-          </nav>
+          <aside className="forge-services-note">
+            <span className="forge-services-mark" aria-hidden="true">&lt;/&gt;</span>
+            <p>
+              Também criamos <strong>sistemas e sites</strong>
+              <small>pessoais e corporativos.</small>
+            </p>
+          </aside>
         </div>
       </div>
     </main>
